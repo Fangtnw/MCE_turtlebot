@@ -79,99 +79,84 @@ class Turtlebot3Controller(Node):
 
     #     self.publishVelocityCommand(0.0, 0.0)
 
-    # def TurnTo(self, tenths_of_degrees):
-    #     current_orientation = self.valueOdometry['orientation']
-    #     current_yaw = self.quaternion_to_yaw(current_orientation)
-
-    #     target_yaw = math.radians(tenths_of_degrees / 10.0)
-
-    #     while abs(current_yaw - target_yaw) > 0.01:  # Adjust threshold as needed
-    #         error = target_yaw - current_yaw
-
-    #         # Determine the shortest direction to turn
-    #         if error > math.pi:
-    #             error -= 2 * math.pi
-    #         elif error < -math.pi:
-    #             error += 2 * math.pi
-
-    #         angular_velocity = 0.2 if error > 0 else -0.2  # Adjust angular velocity as needed
-
-    #         self.publishVelocityCommand(0.0, angular_velocity)
-
-    #         rclpy.spin_once(self, timeout_sec=0.1)
-    #         current_yaw = self.quaternion_to_yaw(self.valueOdometry['orientation'])
-
-    #     self.publishVelocityCommand(0.0, 0.0)
-
-    # def quaternion_to_yaw(self, quaternion):
-    #     t3 = +2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y)
-    #     t4 = +1.0 - 2.0 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z)
-    #     return math.degrees(math.atan2(t3, t4))
-
     def timerCallback(self):
         global laser
-        # global linear
-        # global angular
-        # laser = self.valueLaserRaw['ranges']
-        print("-----------------------------------------------------------")
-        print('timer triggered')
-        msg = self.scanSubscriber.get_last_message()
+        global linear
+        global angular
+        global odom
+        laser = self.valueLaserRaw['ranges']
+        odom = self.valueOdometry['orientation']
+        #DumbWander()
+        #TurnClosest()
+        TurnTo(30)
+        linearVelocity = linear #m/s
+        angularVelocity = angular #rad/s
+        self.publishVelocityCommand(linearVelocity,angularVelocity)
 
-        # Call the obstacle avoidance function
-        self.DumbWander00(self, msg)
-            
-    # def DumbWander(self, msg): #HW00
-    #     forward_ranges = msg.ranges[0:30]
-    #     # for forward_ranges in msg.ranges[0:30]+ msg.ranges[330:360]:
-    #     for forward_ranges in msg.ranges[0:360]:
-    #         if forward_ranges < 0.3:
-    #             print('Stop')
-    #             self.publishVelocityCommand(0.0, 0.0)
-    #         else:
-    #             print('forword')
-    #             self.publishVelocityCommand(0.1, 0.0)
+def DumbWander():
+    global linear
+    global angular
+    if any((r < 0.3 and r > 0) for r in laser[0:30]+laser[330:360]):
+        print('Obstacle detected. Stopping.')
+        linear = 0.0
+        angular = 0.0
+    else:
+        linear = 0.1
+        angular = 0.0
+        print('The way is clear sir')
 
-    # def HW01(self, msg):
-    #         min = 5.0
-    #         for i in msg.ranges[0:360]:
-    #             if min > i and i > 0.0:
-    #                 min = i
-    #         r = msg.index(min)
-    #         if 350 < r < 360 or 0 < r < 10:
-    #             self.publishVelocityCommand(0, 0)
-    #         elif 11 < r < 180:
-    #             self.publishVelocityCommand(0, -((r/180)-1)*1.5)
-    #         elif 181 < r < 349:
-    #             self.publishVelocityCommand(0, (((r-180)/180)-1)*1.5)
-                
-    # def TurnClosest(self, msg): #HW01
-    #     min_distance = 5.0  
-    #     closest_angle = None
-        
-    #     for angle, distance in enumerate(msg.ranges):
-    #         if 0.0 < distance < min_distance:
-    #             min_distance = distance
-    #             closest_angle = angle
-        
-    #     if closest_angle is None:
-    #         self.publishVelocityCommand(0, 0)  # No valid detection
-    #     else:
-    #         if 350 < closest_angle < 360 or 0 <= closest_angle < 10:
-    #             self.publishVelocityCommand(0, 0)  # Closest object is directly in front
-    #         elif 10 < closest_angle <= 180:
-    #             angular_speed = -((closest_angle / 180) - 1) * 1.5
-    #             self.publishVelocityCommand(0, angular_speed)
-    #         elif 180 < closest_angle <= 349:
-    #             angular_speed = (((closest_angle - 180) / 180) - 1) * 1.5
-    #             self.publishVelocityCommand(0, angular_speed)
+def TurnClosest():
+    global linear
+    global angular
+    linear=0.0
+    angular=0.0
+    min = 0.5
+    for i in laser[0:360]:
+        if min > i and i > 0.0:
+            min = i
+    r = laser.index(min)
+    if 350 < r < 360 or 0 < r < 10:
+        linear = 0.0
+        angular = 0.0
+    elif 11 < r < 180:
+        linear = 0.0
+        angular = -((r/180)-1)*1.5
+    elif 181 < r < 349:
+        linear = 0.0
+        angular = (((r-180)/180)-1)*1.5
 
-    def DumbWander00(self, msg):
-            if any((r < 0.2 and r > 0) for r in msg.ranges[0:30]+laser.ranges[330:360]):
-                self.publishVelocityCommand(0.0, 0.0)
-                self.get_logger().info('Obstacle detected. Stopping.')
-            else:
-                self.publishVelocityCommand(0.1, 0.0)
-                self.get_logger().info('The way is clear sir')
+def TurnTo(tenths_of_degrees):
+    global linear
+    global angular
+    current_orientation = odom
+    current_yaw = quaternion_to_yaw(current_orientation)
+
+    target_yaw = math.radians(tenths_of_degrees / 10.0)
+
+    while abs(current_yaw - target_yaw) > 0.01:  # Adjust threshold as needed
+        error = target_yaw - current_yaw
+
+            # Determine the shortest direction to turn
+        if error > math.pi:
+            error -= 2 * math.pi
+        elif error < -math.pi:
+            error += 2 * math.pi
+
+        angular_velocity = 0.2 if error > 0 else -0.2  # Adjust angular velocity as needed
+
+        linear = 0
+        angular = angular_velocity
+
+        rclpy.spin_once(timeout_sec=0.1)
+        current_yaw = quaternion_to_yaw(odom)
+
+        linear = 0
+        angular = 0
+
+def quaternion_to_yaw(quaternion):
+    t3 = +2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y)
+    t4 = +1.0 - 2.0 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z)
+    return math.degrees(math.atan2(t3, t4))
 
 def robotStop():
     node = rclpy.create_node('tb3Stop')

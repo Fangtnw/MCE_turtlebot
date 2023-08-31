@@ -61,34 +61,18 @@ class Turtlebot3Controller(Node):
             'angularVelocity':msg.twist.twist.angular,
         }
 
-    # def GoTo(self, distance_cm):
-    #     linear_velocity = 0.2  # Adjust linear velocity as needed
-
-    #     if distance_cm < 0:
-    #         linear_velocity *= -1
-
-    #     distance_to_travel = abs(distance_cm / 10.0)
-    #     initial_position = self.valueOdometry['position'].x
-    #     current_position = initial_position
-
-    #     while abs(current_position - initial_position) < distance_to_travel:
-    #         self.publishVelocityCommand(linear_velocity, 0.0)
-
-    #         rclpy.spin_once(self, timeout_sec=0.1)
-    #         current_position = self.valueOdometry['position'].x
-
-    #     self.publishVelocityCommand(0.0, 0.0)
-
     def timerCallback(self):
         global laser
         global linear
         global angular
         global odom
+        global pos
         laser = self.valueLaserRaw['ranges']
         odom = self.valueOdometry['orientation']
+        pos = self.valueOdometry['position'].x
         #DumbWander()
-        #TurnClosest()
-        TurnTo(30)
+        TurnClosest()
+        #TurnTo(30)
         linearVelocity = linear #m/s
         angularVelocity = angular #rad/s
         self.publishVelocityCommand(linearVelocity,angularVelocity)
@@ -96,7 +80,7 @@ class Turtlebot3Controller(Node):
 def DumbWander():
     global linear
     global angular
-    if any((r < 0.3 and r > 0) for r in laser[0:30]+laser[330:360]):
+    if any((r < 0.3 and r > 0) for r in laser[0:20]+laser[340:360]):
         print('Obstacle detected. Stopping.')
         linear = 0.0
         angular = 0.0
@@ -110,11 +94,12 @@ def TurnClosest():
     global angular
     linear=0.0
     angular=0.0
-    min = 0.5
+    min = 5.0
+    r = 0.0
     for i in laser[0:360]:
         if min > i and i > 0.0:
             min = i
-    r = laser.index(min)
+            r = laser.index(min)
     if 350 < r < 360 or 0 < r < 10:
         linear = 0.0
         angular = 0.0
@@ -124,6 +109,27 @@ def TurnClosest():
     elif 181 < r < 349:
         linear = 0.0
         angular = (((r-180)/180)-1)*1.5
+
+def GoTo(distance_cm):
+      # Adjust linear velocity as needed
+    global linear
+    global angular
+    global pos
+    linear=0.0
+    angular=0.0
+    if distance_cm < 0:
+        linear *= -1
+    distance_to_travel = abs(distance_cm / 10.0)
+    initial_position = pos
+    current_position = initial_position
+
+    while abs(current_position - initial_position) < distance_to_travel:
+        linear = 0.2
+        angular = 0.0
+        rclpy.spin_once(timeout_sec=0.1)
+        current_position = pos
+    linear = 0.0
+    angular = 0.0
 
 def TurnTo(tenths_of_degrees):
     global linear

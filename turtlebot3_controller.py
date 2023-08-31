@@ -80,7 +80,7 @@ class Turtlebot3Controller(Node):
 def DumbWander():
     global linear
     global angular
-    if any((r < 0.3 and r > 0) for r in laser[0:20]+laser[340:360]):
+    if any((r < 0.3 and r > 0) for r in laser[0:15]+laser[345:360]):
         print('Obstacle detected. Stopping.')
         linear = 0.0
         angular = 0.0
@@ -99,7 +99,7 @@ def TurnClosest():
     for i in laser[0:360]:
         if min > i and i > 0.0:
             min = i
-            r = laser.index(min)
+        r = laser.index(min)
     if 350 < r < 360 or 0 < r < 10:
         linear = 0.0
         angular = 0.0

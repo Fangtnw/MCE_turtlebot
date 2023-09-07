@@ -11,6 +11,26 @@ from nav_msgs.msg import Odometry
 #from std_msgs.msg import String
 import math
 
+deltaturn = 0.0
+totalturn = 0.0
+previousturn = 0.0
+previousx = 0.0
+previousy = 0.0
+totaldistance = 0.0
+deltadistance = 0.0
+goaldistance = 0.0
+count = 0
+direction = 0
+forcal = 0.0
+forwalk = 0.0
+
+start = 1
+state = 1
+totaldegree = 0
+predegree = 0
+nowdegree = 0
+count = 0
+
 class Turtlebot3Controller(Node):
 
     def __init__(self):
@@ -56,23 +76,57 @@ class Turtlebot3Controller(Node):
     def odomCallback(self, msg):
         self.valueOdometry = {
             'position':msg.pose.pose.position,
+            'positionX':msg.pose.pose.position.x,
+            'positionY':msg.pose.pose.position.y,
+            'positionZ':msg.pose.pose.position.z,
             'orientation':msg.pose.pose.orientation,
+            'orientationX':msg.pose.pose.orientation.x,
+            'orientationY':msg.pose.pose.orientation.y,
+            'orientationZ':msg.pose.pose.orientation.z,
+            'orientationW':msg.pose.pose.orientation.w,
             'linearVelocity':msg.twist.twist.linear,
             'angularVelocity':msg.twist.twist.angular,
         }
 
     def timerCallback(self):
-        global laser
-        global linear
-        global angular
-        global odom
-        global pos
+        global laser,recentx,recenty,dataPosix,dataPosiy,linear,angular,orienx,orieny,orienz,orienw
+        dataPosix = self.valueOdometry['positionX']
+        dataPosiy = self.valueOdometry['positionY']
+        orienx = self.valueOdometry['orientationX']
+        orieny = self.valueOdometry['orientationY']
+        orienz = self.valueOdometry['orientationZ']
+        orienw = self.valueOdometry['orientationW']
         laser = self.valueLaserRaw['ranges']
-        odom = self.valueOdometry['orientation']
-        pos = self.valueOdometry['position'].x
+        recentx = self.valueOdometry['positionX']
+        recenty = self.valueOdometry['positionY']
         #DumbWander()
-        TurnClosest()
-        #TurnTo(30)
+        #TurnClosest()
+        if state ==1:
+            GoTo(300)
+        if state ==2:
+            TurnTo(-1210)
+        if state ==3:
+            GoTo(250)
+        if state ==4:
+            TurnTo(270)
+        if state ==5:
+            GoTo(50)
+        if state ==6:
+            TurnTo(-450)
+        if state ==7:
+            GoTo(50)
+        if state ==8:
+            TurnTo(-650)
+        if state ==9:
+            GoTo(100)
+        if state ==10:
+            TurnTo(-850)
+        if state ==11:
+            GoTo(100)
+        if state ==12:
+            TurnTo(-500)    
+        if state ==12:
+            GoTo(120)         
         linearVelocity = linear #m/s
         angularVelocity = angular #rad/s
         self.publishVelocityCommand(linearVelocity,angularVelocity)
@@ -110,59 +164,150 @@ def TurnClosest():
         linear = 0.0
         angular = (((r-180)/180)-1)*1.5
 
-def GoTo(distance_cm):
-      # Adjust linear velocity as needed
-    global linear
-    global angular
-    global pos
-    linear=0.0
-    angular=0.0
-    if distance_cm < 0:
-        linear *= -1
-    distance_to_travel = abs(distance_cm / 10.0)
-    initial_position = pos
-    current_position = initial_position
+def GoTo(centimeter):
+    global direction,previousx,previousy,totaldistance,deltadistance,goaldistance,count,linear,angular,state
+    goaldistance = centimeter/100
+    if centimeter >= 0:
+        direction = 1
+        while totaldistance < goaldistance :    
+            deltadistance = math.sqrt(((recentx-previousx)*(recentx-previousx))+((recenty-previousy)*(recenty-previousy)))  
+            #print('deltadistane = ',deltadistance)
+            #print('recentx = ',recentx)
+            #print('recenty = ',recenty)
+            #print('previousx = ',previousx)
+            #print('previousy = ',previousy)
+            totaldistance = totaldistance + deltadistance
+            previousx = recentx
+            previousy = recenty
+            print(totaldistance)
 
-    while abs(current_position - initial_position) < distance_to_travel:
-        linear = 0.2
-        angular = 0.0
-        rclpy.spin_once(timeout_sec=0.1)
-        current_position = pos
-    linear = 0.0
-    angular = 0.0
+            if(deltadistance==0.0) and count != 1:
+                count = 1
+            else:
+                pass
 
-def TurnTo(tenths_of_degrees):
-    global linear
-    global angular
-    current_orientation = odom
-    current_yaw = quaternion_to_yaw(current_orientation)
+            if count == 1:
+                linear = direction * 0.1 #m/s
+                angular = 0.0
 
-    target_yaw = math.radians(tenths_of_degrees / 10.0)
+            else:
+                totaldistance = 0.0
+                linear = 0.0 #m/s
+                angular = 0.0
 
-    while abs(current_yaw - target_yaw) > 0.01:  # Adjust threshold as needed
-        error = target_yaw - current_yaw
+            return linear,angular#,0
+        else:
+            print("destination reached")
+            linear = 0.0 #m/s
+            angular = 0.0
+            count = 0
+            direction = 0
+            state = state+1
+        passwalk = goaldistance - totaldistance
+        totaldistance = 0.0    
+        return linear,angular#,passwalk
+    else:
+        direction = -1
+        while totaldistance > goaldistance :    
+            deltadistance = math.sqrt(((recentx-previousx)*(recentx-previousx))+((recenty-previousy)*(recenty-previousy)))  
+            #print('deltadistane = ',deltadistance)
+            #print('recentx = ',recentx)
+            #print('recenty = ',recenty)
+            #print('previousx = ',previousx)
+            #print('previousy = ',previousy)
+            totaldistance = totaldistance - deltadistance
+            previousx = recentx
+            previousy = recenty
+            print(totaldistance)
 
-            # Determine the shortest direction to turn
-        if error > math.pi:
-            error -= 2 * math.pi
-        elif error < -math.pi:
-            error += 2 * math.pi
+            if(deltadistance==0.0) and count != 1:
+                count = 1
+            else:
+                pass
 
-        angular_velocity = 0.2 if error > 0 else -0.2  # Adjust angular velocity as needed
+            if count == 1:
+                linear = direction * 0.1 #m/s
+                angular = 0.0
 
-        linear = 0
-        angular = angular_velocity
+            else:
+                totaldistance = 0.0
+                linear = 0.0 #m/s
+                angular = 0.0
 
-        rclpy.spin_once(timeout_sec=0.1)
-        current_yaw = quaternion_to_yaw(odom)
+            return linear,angular#,0
+        else:
+            print("destination reached")
+            linear = 0.0 #m/s
+            angular = 0.0
+            count = 0
+            direction = 0
+            state = state+1
+        passwalk = goaldistance - totaldistance
+        totaldistance = 0.0    
+        return linear,angular#,passwalk
+    
+def TurnTo(angle):
+    global linear, angular, state, totaldegree, predegree, nowdegree
+    ##if totaldegree == 0:
+    if angle>360:
+        angle = angle-((math.floor(angle/360))*360)
+    elif angle < -360:
+        angle = angle+((math.floor(abs(angle)/360))*360)
+    try:
+        euler_from_quaternion(orienx, orieny, orienz, orienw) ## ใช้ degreeZ :หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
+        linear=0.0
+        angular=0.0
+        nowdegree = degreeZ
+        if predegree == 0:
+            predegree = degreeZ
+        if totaldegree<abs(angle) :
+            totaldegree = totaldegree + abs(abs(nowdegree)-abs(predegree))
+            print('pre = ' , abs(predegree))
+            print('now = ' , abs(nowdegree))
+            print('dis = ' , abs(abs(nowdegree)-abs(predegree)))
+            print('totaldegree' , totaldegree)
+            predegree = nowdegree
+            if angle > 0:
+                if angle - totaldegree < 15:
+                    angular = 0.05
+                else:
+                    angular = 0.2
+            elif angle < 0:
+                if abs(angle) - totaldegree < 15:
+                    angular = -0.05
+                else:                
+                    angular = -0.2
+        else:
+            totaldegree = 0
+            predegree = 0
+            print("destination reached")
+            state = state + 1
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
 
-        linear = 0
-        angular = 0
+def euler_from_quaternion(x, y, z, w):
+        global degreeZ
+        """
+        Convert a quaternion into euler angles (roll, pitch, yaw)
+        roll is rotation around x in radians (counterclockwise)
+        pitch is rotation around y in radians (counterclockwise)
+        yaw is rotation around z in radians (counterclockwise)
+        """
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll_x = math.atan2(t0, t1)
+     
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        pitch_y = math.asin(t2)
+     
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw_z = math.atan2(t3, t4)
 
-def quaternion_to_yaw(quaternion):
-    t3 = +2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y)
-    t4 = +1.0 - 2.0 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z)
-    return math.degrees(math.atan2(t3, t4))
+        degreeZ = (yaw_z/math.pi)*180 ##หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
+        ##return roll_x, pitch_y, yaw_z # in radians
 
 def robotStop():
     node = rclpy.create_node('tb3Stop')
@@ -186,6 +331,7 @@ def main(args=None):
         tb3ControllerNode.destroy_node()
         robotStop()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

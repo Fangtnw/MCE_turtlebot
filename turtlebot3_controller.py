@@ -10,7 +10,26 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 #from std_msgs.msg import String
 import math
+turncase = ''
+startdegree = 0.0
+b4dif = 0.0
+bount = 0
+step = 1 
+deltaturn = 0.0
+totalturn = 0.0
+previousturn = 0.0
+previousx = 0.0
+previousy = 0.0
+totaldistance = 0.0
+deltadistance = 0.0
+goaldistance = 0.0
+count = 0
+direction = 0
+turncal = 0.0
+gocal = 0.0
 
+linear = 0.0
+angular = 0.0
 deltaturn = 0.0
 totalturn = 0.0
 previousturn = 0.0
@@ -89,7 +108,7 @@ class Turtlebot3Controller(Node):
         }
 
     def timerCallback(self):
-        global laser,recentx,recenty,dataPosix,dataPosiy,linear,angular,orienx,orieny,orienz,orienw
+        global laser,recentx,recenty,dataPosix,dataPosiy,linear,angular,orienx,orieny,orienz,orienw,theta
         dataPosix = self.valueOdometry['positionX']
         dataPosiy = self.valueOdometry['positionY']
         orienx = self.valueOdometry['orientationX']
@@ -99,49 +118,77 @@ class Turtlebot3Controller(Node):
         laser = self.valueLaserRaw['ranges']
         recentx = self.valueOdometry['positionX']
         recenty = self.valueOdometry['positionY']
-        #DumbWander()
-        #TurnClosest()
-        if state ==1:
-            GoTo(300)
-        if state ==2:
-            TurnTo(-1210)
-        if state ==3:
-            GoTo(250)
-        if state ==4:
-            TurnTo(270)
-        if state ==5:
-            GoTo(50)
-        if state ==6:
-            TurnTo(-450)
-        if state ==7:
-            GoTo(50)
-        if state ==8:
-            TurnTo(-650)
-        if state ==9:
-            GoTo(100)
-        if state ==10:
-            TurnTo(-850)
-        if state ==11:
-            GoTo(100)
-        if state ==12:
-            TurnTo(-500)    
-        if state ==12:
-            GoTo(120)         
+        siny_cosp =  2 * ((self.valueOdometry["orientationW"]*self.valueOdometry["orientationZ"]) + (self.valueOdometry["orientationX"]*self.valueOdometry["orientationY"]))
+        cosy_cosp = 1 - ( 2 * ((self.valueOdometry["orientationY"]*self.valueOdometry["orientationY"]) + (self.valueOdometry["orientationZ"]*self.valueOdometry["orientationZ"])))
+        theta = math.atan2(siny_cosp,cosy_cosp)
         linearVelocity = linear #m/s
         angularVelocity = angular #rad/s
+        # linearVelocity,angularVelocity = robotLoop()
+        LookLook()
         self.publishVelocityCommand(linearVelocity,angularVelocity)
 
 def DumbWander():
     global linear
     global angular
-    if any((r < 0.3 and r > 0) for r in laser[0:15]+laser[345:360]):
-        print('Obstacle detected. Stopping.')
+    front_laser = laser[0:15]+laser[345:360]
+    if any((r < 0.3 and r > 0) for r in front_laser):
+        print('Obstacle detected. Avoiding.')
         linear = 0.0
-        angular = 0.0
+        angular = 0.4
     else:
         linear = 0.1
         angular = 0.0
         print('The way is clear sir')
+
+def LookLook():
+    global linear
+    global angular
+    front_laser = laser[0:15]+laser[345:360]
+    left_laser = laser[60:120]
+    right_laser = laser[240:300]
+    back_laser = laser[165:195]
+
+    obstacle_char = 'X'
+    linear = 0.0
+    angular = 0.0
+
+    # Create a 2D grid to represent the environment
+    grid = [[' ' for _ in range(5)] for _ in range(5)]
+
+    if any((r < 0.3 and r > 0) for r in front_laser):
+        grid[0][2] = obstacle_char
+    if any((r < 0.3 and r > 0) for r in left_laser):
+        grid[2][0] = obstacle_char
+    if any((r < 0.3 and r > 0) for r in right_laser):
+        grid[2][4] = obstacle_char
+    if any((r < 0.3 and r > 0) for r in back_laser):
+        grid[4][2] = obstacle_char
+
+    # Display the grid in the terminal
+    for row in grid:
+        print(' '.join(row))
+
+
+def TurnMostFar():
+    global linear
+    global angular
+    linear=0.0
+    angular=0.0
+    max = 0.0
+    r = 0.0
+    for i in laser[0:360]:
+        if max < i and i > 0.0:
+            max = i
+        r = laser.index(max)
+    if 350 < r < 360 or 0 < r < 10:
+        linear = 0.0
+        angular = 0.0
+    elif 11 < r < 180:
+        linear = 0.0
+        angular = -((r/180)-1)*1.5
+    elif 181 < r < 349:
+        linear = 0.0
+        angular = (((r-180)/180)-1)*1.5
 
 def TurnClosest():
     global linear
@@ -246,68 +293,172 @@ def GoTo(centimeter):
         totaldistance = 0.0    
         return linear,angular#,passwalk
     
-def TurnTo(angle):
-    global linear, angular, state, totaldegree, predegree, nowdegree
-    ##if totaldegree == 0:
-    if angle>360:
-        angle = angle-((math.floor(angle/360))*360)
-    elif angle < -360:
-        angle = angle+((math.floor(abs(angle)/360))*360)
-    try:
-        euler_from_quaternion(orienx, orieny, orienz, orienw) ## ใช้ degreeZ :หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
-        linear=0.0
-        angular=0.0
-        nowdegree = degreeZ
-        if predegree == 0:
-            predegree = degreeZ
-        if totaldegree<abs(angle) :
-            totaldegree = totaldegree + abs(abs(nowdegree)-abs(predegree))
-            print('pre = ' , abs(predegree))
-            print('now = ' , abs(nowdegree))
-            print('dis = ' , abs(abs(nowdegree)-abs(predegree)))
-            print('totaldegree' , totaldegree)
-            predegree = nowdegree
-            if angle > 0:
-                if angle - totaldegree < 15:
-                    angular = 0.05
-                else:
-                    angular = 0.2
-            elif angle < 0:
-                if abs(angle) - totaldegree < 15:
-                    angular = -0.05
-                else:                
-                    angular = -0.2
+def TurnTo(degrees):
+    global previousturn
+    global deltaturn
+    global totalturn
+    global bount
+    global turncase
+    passcal = 0.0
+    diff = 0.0
+    fordir = 0.0
+    kp = 2
+    #destination config
+    destination = degrees
+    if destination >= 360  :
+        destination = destination % 360
+    elif destination <= -360 :
+        destination = destination % -360
+    else:
+        pass
+
+    #print(destination)
+    if destination >= 0 :
+        if destination >= 180 :
+            #print('rotateright')
+            turncase = 'right'
+            destination = 360 - destination
+        elif destination < 180 :
+             #print('rotateleft')
+            turncase = 'left'   
+    elif destination < 0 :
+        if destination >= -180 :
+            #print('rotateright')
+            turncase = 'right'
+        elif destination < -180 :
+             #print('rotateleft')
+            turncase = 'left'  
+            destination = -360 - destination
+
+    #find a solution to change orient.z to degree then boom finish
+    if degrees >= 0 : 
+        while destination-totalturn >= 0.1 :
+            startdegree = theta
+            if startdegree >= 0.0 :
+                startdegree = remap(startdegree,0.0,3.14,0.0,180)
+            else:
+                startdegree = remap(startdegree,-3.14,-0.0,0.0,180) + 180
+            #print('after map =',startdegree)
+
+            deltaturn = abs(startdegree - previousturn)
+            if deltaturn >= 100:
+                deltaturn = abs(360-deltaturn)
+            else:
+                pass
+
+            totalturn = totalturn + deltaturn
+            previousturn = startdegree
+            print(totalturn)
+
+            #กันerror
+            b4dif = abs(totalturn-destination) 
+            if b4dif > 180:
+                b4dif = abs(b4dif - 360) 
+            else:
+                pass
+            #print(b4dif)    
+            diff = b4dif/180
+            diff = (kp*diff)+0.4
+            diff = round(diff,1)
+
+            if(deltaturn<=0.1) and bount != 1:
+                bount = 1
+            else:
+                pass
+
+            if bount == 1:
+                if turncase == 'right':
+                    #print('rotatingright')
+                    linearVelocity = 0.0 #m/s
+                    angularVelocity = -0.8*diff #rad/s
+                elif turncase == 'left':
+                    #print('rotatingleft')
+                    linearVelocity = 0.0 #m/s
+                    angularVelocity = 0.8*diff #rad/s  
+            else:
+                totalturn = 0.0
+                linearVelocity = 0.0 #m/s
+                angularVelocity = 0.0        
+            return linearVelocity,angularVelocity,0
+
         else:
-            totaldegree = 0
-            predegree = 0
-            print("destination reached")
-            state = state + 1
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
+            print("turn done")
+            linearVelocity = 0.0 #m/s
+            angularVelocity = 0.0
+            passcal = destination-totalturn
+            bount = 0
+            totalturn = 0.0
+            # updatestep()
+            return linearVelocity,angularVelocity,passcal
+        
 
-def euler_from_quaternion(x, y, z, w):
-        global degreeZ
-        """
-        Convert a quaternion into euler angles (roll, pitch, yaw)
-        roll is rotation around x in radians (counterclockwise)
-        pitch is rotation around y in radians (counterclockwise)
-        yaw is rotation around z in radians (counterclockwise)
-        """
-        t0 = +2.0 * (w * x + y * z)
-        t1 = +1.0 - 2.0 * (x * x + y * y)
-        roll_x = math.atan2(t0, t1)
-     
-        t2 = +2.0 * (w * y - z * x)
-        t2 = +1.0 if t2 > +1.0 else t2
-        t2 = -1.0 if t2 < -1.0 else t2
-        pitch_y = math.asin(t2)
-     
-        t3 = +2.0 * (w * z + x * y)
-        t4 = +1.0 - 2.0 * (y * y + z * z)
-        yaw_z = math.atan2(t3, t4)
+    else :
+        while destination-totalturn <= -0.1 :
+            startdegree = theta
+            if startdegree >= 0.0 :
+                startdegree = remap(startdegree,0.0,3.14,0.0,180)
+            else:
+                startdegree = remap(startdegree,-3.14,-0.0,0.0,180) + 180
+            #print('after map =',startdegree)
 
-        degreeZ = (yaw_z/math.pi)*180 ##หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
-        ##return roll_x, pitch_y, yaw_z # in radians
+            deltaturn = abs(startdegree - previousturn)
+            if deltaturn >= 100:
+                deltaturn = abs(360-deltaturn)
+            else:
+                pass
+
+            totalturn = totalturn - deltaturn
+            previousturn = startdegree
+            print(totalturn)
+
+            #กันerror
+            b4dif = abs(totalturn-destination) 
+            if b4dif > 180:
+                b4dif = abs(b4dif - 360) 
+            else:
+                pass
+            #print(b4dif)    
+            diff = b4dif/180
+            diff = (kp*diff)+0.4
+            diff = round(diff,1)
+
+            if(deltaturn<=0.1) and bount != 1:
+                bount = 1
+            else:
+                pass
+
+            if bount == 1:
+                if turncase == 'right':
+                    #print('rotatingright')
+                    linearVelocity = 0.0 #m/s
+                    angularVelocity = -0.8*diff #rad/s
+                elif turncase == 'left':
+                    #print('rotatingleft')
+                    linearVelocity = 0.0 #m/s
+                    angularVelocity = 0.8*diff #rad/s  
+            else:
+                totalturn = 0.0
+                linearVelocity = 0.0 #m/s
+                angularVelocity = 0.0        
+            return linearVelocity,angularVelocity,0
+
+        else:
+            print("turn done")
+            linearVelocity = 0.0 #m/s
+            angularVelocity = 0.0
+            passcal = destination-totalturn
+            bount = 0
+            totalturn = 0.0
+            # updatestep()
+            return linearVelocity,angularVelocity,passcal
+
+def remap(num, in_min, in_max, out_min, out_max):
+    return (num - in_min)*(out_max - out_min) / (in_max - in_min) + out_min
+
+def robotLoop():
+    LookLook()
+    #TurnClosest()
+
 
 def robotStop():
     node = rclpy.create_node('tb3Stop')

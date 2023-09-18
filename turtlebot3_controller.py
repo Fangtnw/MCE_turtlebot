@@ -50,6 +50,9 @@ predegree = 0
 nowdegree = 0
 count = 0
 
+wandstate = 1
+target_angle = None
+
 class Turtlebot3Controller(Node):
 
     def __init__(self):
@@ -124,7 +127,9 @@ class Turtlebot3Controller(Node):
         linearVelocity = linear #m/s
         angularVelocity = angular #rad/s
         # linearVelocity,angularVelocity = robotLoop()
-        LookLook()
+        # WhatDoISee()
+        SmartWander()
+        # linear,angular = robotLoop()
         self.publishVelocityCommand(linearVelocity,angularVelocity)
 
 def DumbWander():
@@ -132,15 +137,34 @@ def DumbWander():
     global angular
     front_laser = laser[0:15]+laser[345:360]
     if any((r < 0.3 and r > 0) for r in front_laser):
-        print('Obstacle detected. Avoiding.')
+        print('Obstacle detected. Stopping.')
         linear = 0.0
-        angular = 0.4
+        angular = 0.0
     else:
         linear = 0.1
         angular = 0.0
         print('The way is clear sir')
 
-def LookLook():
+def SmartWander():
+    global linear, angular, wandstate, passcal, theta, target_angle
+    front_laser = laser[0:25] + laser[335:360]
+    avoid_laser = laser[0:15] + laser[345:360]
+
+    if wandstate == 0 or wandstate == 2 :
+        linear, angular, passcal = TurnTo(70)
+    elif any((r < 0.25 and r > 0) for r in front_laser):
+        print('Obstacle detected. Avoiding.')
+        if wandstate == 1:
+            linear = 0.0
+            angular = 0.0
+            print('STOP')
+            wandstate = 0
+    elif wandstate == 1:
+        print('The way is clear sir') 
+        linear = 1.5  # Move forward when the way is clear
+        angular = 0.0
+        
+def WhatDoISee():
     global linear
     global angular
     front_laser = laser[0:15]+laser[345:360]
@@ -167,28 +191,6 @@ def LookLook():
     # Display the grid in the terminal
     for row in grid:
         print(' '.join(row))
-
-
-def TurnMostFar():
-    global linear
-    global angular
-    linear=0.0
-    angular=0.0
-    max = 0.0
-    r = 0.0
-    for i in laser[0:360]:
-        if max < i and i > 0.0:
-            max = i
-        r = laser.index(max)
-    if 350 < r < 360 or 0 < r < 10:
-        linear = 0.0
-        angular = 0.0
-    elif 11 < r < 180:
-        linear = 0.0
-        angular = -((r/180)-1)*1.5
-    elif 181 < r < 349:
-        linear = 0.0
-        angular = (((r-180)/180)-1)*1.5
 
 def TurnClosest():
     global linear
@@ -292,171 +294,52 @@ def GoTo(centimeter):
         passwalk = goaldistance - totaldistance
         totaldistance = 0.0    
         return linear,angular#,passwalk
-    
-def TurnTo(degrees):
-    global previousturn
-    global deltaturn
-    global totalturn
-    global bount
-    global turncase
+
+def TurnTo(degrees_to_turn):
+    global wandstate, linear, angular, theta, passcal,target_angle,kp
     passcal = 0.0
-    diff = 0.0
-    fordir = 0.0
-    kp = 2
-    #destination config
-    destination = degrees
-    if destination >= 360  :
-        destination = destination % 360
-    elif destination <= -360 :
-        destination = destination % -360
+
+    if wandstate == 0:
+        kp = 6
+
+        # Calculate the target angle by adding the desired turn to the current angle
+        target_angle = math.degrees(theta) + degrees_to_turn
+
+        # Normalize the target angle to be in the range of [-180, 180] degrees
+        target_angle = (target_angle + 180) % 360 - 180
+
+        wandstate = 2
+
+    # Calculate the error as the difference between the target angle and the current angle
+    error = target_angle - math.degrees(theta)
+
+    # Set the proportional control gain (kp) and limit the maximum angular velocity
+    max_angular_velocity = 3.0  # You can adjust this value
+    angular = kp * error
+
+
+    if abs(angular) > max_angular_velocity:
+        angular = max_angular_velocity if angular > 0 else -max_angular_velocity
+
+    # Check if the desired angle is reached
+    if abs(error) <= 10.0:  # You can adjust this threshold
+        linear = 0.0
+        angular = 0.0
+        totalturn = 0.0
+        passcal = error
+        print('TurnDone')
+        wandstate = 1
     else:
-        pass
+        print(f'Turning: Current angle: {math.degrees(theta)}, Desired turn: {degrees_to_turn} degrees, Error: {error}')
 
-    #print(destination)
-    if destination >= 0 :
-        if destination >= 180 :
-            #print('rotateright')
-            turncase = 'right'
-            destination = 360 - destination
-        elif destination < 180 :
-             #print('rotateleft')
-            turncase = 'left'   
-    elif destination < 0 :
-        if destination >= -180 :
-            #print('rotateright')
-            turncase = 'right'
-        elif destination < -180 :
-             #print('rotateleft')
-            turncase = 'left'  
-            destination = -360 - destination
+    return linear, angular, passcal
 
-    #find a solution to change orient.z to degree then boom finish
-    if degrees >= 0 : 
-        while destination-totalturn >= 0.1 :
-            startdegree = theta
-            if startdegree >= 0.0 :
-                startdegree = remap(startdegree,0.0,3.14,0.0,180)
-            else:
-                startdegree = remap(startdegree,-3.14,-0.0,0.0,180) + 180
-            #print('after map =',startdegree)
 
-            deltaturn = abs(startdegree - previousturn)
-            if deltaturn >= 100:
-                deltaturn = abs(360-deltaturn)
-            else:
-                pass
 
-            totalturn = totalturn + deltaturn
-            previousturn = startdegree
-            print(totalturn)
-
-            #กันerror
-            b4dif = abs(totalturn-destination) 
-            if b4dif > 180:
-                b4dif = abs(b4dif - 360) 
-            else:
-                pass
-            #print(b4dif)    
-            diff = b4dif/180
-            diff = (kp*diff)+0.4
-            diff = round(diff,1)
-
-            if(deltaturn<=0.1) and bount != 1:
-                bount = 1
-            else:
-                pass
-
-            if bount == 1:
-                if turncase == 'right':
-                    #print('rotatingright')
-                    linearVelocity = 0.0 #m/s
-                    angularVelocity = -0.8*diff #rad/s
-                elif turncase == 'left':
-                    #print('rotatingleft')
-                    linearVelocity = 0.0 #m/s
-                    angularVelocity = 0.8*diff #rad/s  
-            else:
-                totalturn = 0.0
-                linearVelocity = 0.0 #m/s
-                angularVelocity = 0.0        
-            return linearVelocity,angularVelocity,0
-
-        else:
-            print("turn done")
-            linearVelocity = 0.0 #m/s
-            angularVelocity = 0.0
-            passcal = destination-totalturn
-            bount = 0
-            totalturn = 0.0
-            # updatestep()
-            return linearVelocity,angularVelocity,passcal
-        
-
-    else :
-        while destination-totalturn <= -0.1 :
-            startdegree = theta
-            if startdegree >= 0.0 :
-                startdegree = remap(startdegree,0.0,3.14,0.0,180)
-            else:
-                startdegree = remap(startdegree,-3.14,-0.0,0.0,180) + 180
-            #print('after map =',startdegree)
-
-            deltaturn = abs(startdegree - previousturn)
-            if deltaturn >= 100:
-                deltaturn = abs(360-deltaturn)
-            else:
-                pass
-
-            totalturn = totalturn - deltaturn
-            previousturn = startdegree
-            print(totalturn)
-
-            #กันerror
-            b4dif = abs(totalturn-destination) 
-            if b4dif > 180:
-                b4dif = abs(b4dif - 360) 
-            else:
-                pass
-            #print(b4dif)    
-            diff = b4dif/180
-            diff = (kp*diff)+0.4
-            diff = round(diff,1)
-
-            if(deltaturn<=0.1) and bount != 1:
-                bount = 1
-            else:
-                pass
-
-            if bount == 1:
-                if turncase == 'right':
-                    #print('rotatingright')
-                    linearVelocity = 0.0 #m/s
-                    angularVelocity = -0.8*diff #rad/s
-                elif turncase == 'left':
-                    #print('rotatingleft')
-                    linearVelocity = 0.0 #m/s
-                    angularVelocity = 0.8*diff #rad/s  
-            else:
-                totalturn = 0.0
-                linearVelocity = 0.0 #m/s
-                angularVelocity = 0.0        
-            return linearVelocity,angularVelocity,0
-
-        else:
-            print("turn done")
-            linearVelocity = 0.0 #m/s
-            angularVelocity = 0.0
-            passcal = destination-totalturn
-            bount = 0
-            totalturn = 0.0
-            # updatestep()
-            return linearVelocity,angularVelocity,passcal
-
-def remap(num, in_min, in_max, out_min, out_max):
-    return (num - in_min)*(out_max - out_min) / (in_max - in_min) + out_min
-
-def robotLoop():
-    LookLook()
+# def robotLoop():
+#     while True:
+#         SmartWander()
+    # WhatDoISee()
     #TurnClosest()
 
 
@@ -486,28 +369,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

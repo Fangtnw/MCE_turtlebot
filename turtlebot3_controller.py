@@ -10,6 +10,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 #from std_msgs.msg import String
 import math
+import random
 turncase = ''
 startdegree = 0.0
 b4dif = 0.0
@@ -43,6 +44,19 @@ direction = 0
 forcal = 0.0
 forwalk = 0.0
 
+Sfront = 0
+Sback = 0
+Sleft = 0
+Sright = 0
+Senfront = []
+Senback = []
+Senleft = []
+Senright = []
+Sfront1 = 0
+Sback1 = 0
+Sleft1 = 0
+Sright1 = 0
+
 start = 1
 state = 1
 totaldegree = 0
@@ -52,6 +66,7 @@ count = 0
 
 wandstate = 1
 target_angle = None
+
 
 class Turtlebot3Controller(Node):
 
@@ -111,7 +126,7 @@ class Turtlebot3Controller(Node):
         }
 
     def timerCallback(self):
-        global laser,recentx,recenty,dataPosix,dataPosiy,linear,angular,orienx,orieny,orienz,orienw,theta
+        global laser,recentx,recenty,dataPosix,dataPosiy,linear,angular,orienx,orieny,orienz,orienw,theta,Sfront,Senfront
         dataPosix = self.valueOdometry['positionX']
         dataPosiy = self.valueOdometry['positionY']
         orienx = self.valueOdometry['orientationX']
@@ -127,8 +142,10 @@ class Turtlebot3Controller(Node):
         linearVelocity = linear #m/s
         angularVelocity = angular #rad/s
         # linearVelocity,angularVelocity = robotLoop()
-        # WhatDoISee()
-        SmartWander()
+        SensorUpdate()
+        # CorridorFollow()
+        WhatDoISee()
+        # SmartWander()
         # linear,angular = robotLoop()
         self.publishVelocityCommand(linearVelocity,angularVelocity)
 
@@ -146,38 +163,57 @@ def DumbWander():
         print('The way is clear sir')
 
 def SmartWander():
+    #wandstate guide || 1 = patrol || 0 = obstacle found || 2 = turning left
     global linear, angular, wandstate, passcal, theta, target_angle
-    front_laser = laser[0:25] + laser[335:360]
+    front_laser = laser[0:8] + laser[352:360]
     avoid_laser = laser[0:15] + laser[345:360]
 
-    if wandstate == 0 or wandstate == 2 :
-        linear, angular, passcal = TurnTo(70)
-    elif any((r < 0.25 and r > 0) for r in front_laser):
+    # if 0.005 < laser[24] < 0.4  or 0.005 < laser[25] < 0.4:
+    #         linear = 0.0
+    #         angular = -0.1
+    #         print('Rim avoided')
+    # if 0.005 < laser[334] < 0.4  or 0.005 < laser[335] < 0.4:
+    #         linear = 0.0
+    #         angular = 0.1
+    #         print('Rim avoided')
+
+    if wandstate == 3:
+        GoTo(-10)
+        
+    elif wandstate == 0 or wandstate == 2:
+        print('Turn to random angle.')
+        random_angle1 = random.uniform(40, 100)
+        random_angle2 = random.uniform(-100, -40)
+        selected_angle = random.choice([random_angle1, random_angle2])
+        linear, angular, passcal = TurnTo(selected_angle)
+        # linear, angular, passcal = TurnTo(90)
+    if any((r < 0.18 and r > 0) for r in laser[0:25] + laser[335:360]):
         print('Obstacle detected. Avoiding.')
-        if wandstate == 1:
+        if wandstate == 1: #detect obstacle during patrol
             linear = 0.0
             angular = 0.0
             print('STOP')
-            wandstate = 0
-    elif wandstate == 1:
-        print('The way is clear sir') 
-        linear = 1.5  # Move forward when the way is clear
+            # wandstate = 0
+            wandstate = 3
+    elif wandstate == 1: # patroling
+        print('The way is clear sir')
+        linear = 0.4 # Move forward when the way is clear
         angular = 0.0
         
 def WhatDoISee():
     global linear
     global angular
-    front_laser = laser[0:15]+laser[345:360]
-    left_laser = laser[60:120]
-    right_laser = laser[240:300]
-    back_laser = laser[165:195]
+    front_laser = laser[0:10]+laser[350:360]
+    left_laser = laser[70:110]
+    right_laser = laser[250:290]
+    back_laser = laser[170:190]
 
     obstacle_char = 'X'
     linear = 0.0
     angular = 0.0
 
     # Create a 2D grid to represent the environment
-    grid = [[' ' for _ in range(5)] for _ in range(5)]
+    grid = [[' ' for _ in range(6)] for _ in range(6)]
 
     if any((r < 0.3 and r > 0) for r in front_laser):
         grid[0][2] = obstacle_char
@@ -187,10 +223,106 @@ def WhatDoISee():
         grid[2][4] = obstacle_char
     if any((r < 0.3 and r > 0) for r in back_laser):
         grid[4][2] = obstacle_char
+        
+    # grid[5][0] = '_'
+    # grid[5][1] = '_'
+    # grid[5][2] = '_'
+    # grid[5][3] = '_'
+    # grid[5][4] = '_'
+
+    row_index = 5
+    for i in range(5):
+        grid[row_index][i] = '_'
 
     # Display the grid in the terminal
     for row in grid:
         print(' '.join(row))
+
+def CorridorFollow():
+    global linear , angular, Sfront , Sback , Sleft , Sright
+    Range_To_Stop = 0.5
+    deltaX = 0.7
+    deltaY = 1
+    maxturn = 0.38#0.32 0.37
+    maxspeed = 0.078
+    if Sleft >= deltaX:
+        Sleft = deltaX
+    if Sright >= deltaX:
+        Sright = deltaX
+    slop = deltaY/deltaX
+    leftfar = slop*Sleft
+    leftnear = -(slop*Sleft) +1
+    rightfar = slop*Sright
+    rightnear = -(slop*Sright) +1
+    if Sfront <= 0.2:
+        linear = 0.0 
+        angular = 0.0
+    else:
+        angular = (leftnear*rightfar*(-maxturn)) + (leftfar*rightnear*maxturn)
+        linear = (-((deltaY/maxturn)*angular)+1)*maxspeed
+        if linear >= maxspeed:
+            linear = maxspeed
+        if linear <= 0.0:
+            linear = 0.0
+        if Sleft >= Range_To_Stop and Sright >= Range_To_Stop:
+            linear = 0.0
+            angular = 0.0
+    print('Speed = ',linear,'  ','Speed Turn = ',angular)
+    return linear,angular
+
+def SensorUpdate():
+    global Sfront
+    global Sback
+    global Sleft
+    global Sright
+    global Senfront
+    global Senback
+    global Senleft
+    global Senright
+    global Sfront1
+    global Sback1
+    global Sleft1
+    global Sright1
+
+    for DATA1 in laser[0:20]+ laser[340:360]:
+            Senfront.append(DATA1)
+            x = len(Senfront)
+            Sfront1 = Sfront1 + DATA1
+            if x == 41 :
+                #print('len',x)
+                Sfront = Sfront1/x
+                Senfront = []
+                Sfront1 = 0
+                #print (Sfront,'  ',Senfront)
+    for DATA2 in laser[70:110]: #data[55:95]:
+            Senleft.append(DATA2)
+            x = len(Senleft)
+            Sleft1 = Sleft1 + DATA2
+            if x == 41 :
+                #print('len',x)
+                Sleft = Sleft1/x
+                Senleft = []
+                Sleft1 = 0
+                #print (Sfront,'  ',Senfront)
+    for DATA3 in laser[160:200]:
+            Senback.append(DATA3)
+            x = len(Senback)
+            Sback1 = Sback1 + DATA3
+            if x == 41 :
+                #print('len',x)
+                Sback = Sback1/x
+                Senback = []
+                Sback1 = 0
+                #print (Sfront,'  ',Senfront)
+    for DATA4 in laser[250:290]:#data[265:305]:
+            Senright.append(DATA4)
+            x = len(Senright)
+            Sright1 = Sright1 + DATA4
+            if x == 41 :
+                #print('len',x)
+                Sright = Sright1/x
+                Senright = []
+                Sright1 = 0
 
 def TurnClosest():
     global linear
@@ -214,7 +346,7 @@ def TurnClosest():
         angular = (((r-180)/180)-1)*1.5
 
 def GoTo(centimeter):
-    global direction,previousx,previousy,totaldistance,deltadistance,goaldistance,count,linear,angular,state
+    global direction,previousx,previousy,totaldistance,deltadistance,goaldistance,count,linear,angular,state,wandstate
     goaldistance = centimeter/100
     if centimeter >= 0:
         direction = 1
@@ -246,6 +378,7 @@ def GoTo(centimeter):
 
             return linear,angular#,0
         else:
+            wandstate = 0
             print("destination reached")
             linear = 0.0 #m/s
             angular = 0.0
@@ -286,6 +419,7 @@ def GoTo(centimeter):
             return linear,angular#,0
         else:
             print("destination reached")
+            wandstate = 0
             linear = 0.0 #m/s
             angular = 0.0
             count = 0
@@ -303,7 +437,11 @@ def TurnTo(degrees_to_turn):
         kp = 6
 
         # Calculate the target angle by adding the desired turn to the current angle
-        target_angle = math.degrees(theta) + degrees_to_turn
+        # Calculate the target angle by adding the desired turn to the current angle
+        if degrees_to_turn >= 0:
+            target_angle = math.degrees(theta) + degrees_to_turn
+        else:
+            target_angle = math.degrees(theta) - abs(degrees_to_turn)
 
         # Normalize the target angle to be in the range of [-180, 180] degrees
         target_angle = (target_angle + 180) % 360 - 180
@@ -314,12 +452,12 @@ def TurnTo(degrees_to_turn):
     error = target_angle - math.degrees(theta)
 
     # Set the proportional control gain (kp) and limit the maximum angular velocity
-    max_angular_velocity = 3.0  # You can adjust this value
+    max_angular_velocity = 1.8  # You can adjust this value
     angular = kp * error
 
 
     if abs(angular) > max_angular_velocity:
-        angular = max_angular_velocity if angular > 0 else -max_angular_velocity
+            angular = max_angular_velocity if angular > 0 else -max_angular_velocity
 
     # Check if the desired angle is reached
     if abs(error) <= 10.0:  # You can adjust this threshold
@@ -334,13 +472,6 @@ def TurnTo(degrees_to_turn):
 
     return linear, angular, passcal
 
-
-
-# def robotLoop():
-#     while True:
-#         SmartWander()
-    # WhatDoISee()
-    #TurnClosest()
 
 
 def robotStop():

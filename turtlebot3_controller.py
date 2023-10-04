@@ -43,6 +43,7 @@ count = 0
 direction = 0
 forcal = 0.0
 forwalk = 0.0
+remaindistance = 0.0
 
 Sfront = 0
 Sback = 0
@@ -143,8 +144,9 @@ class Turtlebot3Controller(Node):
         angularVelocity = angular #rad/s
         # linearVelocity,angularVelocity = robotLoop()
         SensorUpdate()
-        # CorridorFollow()
-        WhatDoISee()
+        if state == 1:
+            CorridorFollow(100)
+        # WhatDoISee()
         # SmartWander()
         # linear,angular = robotLoop()
         self.publishVelocityCommand(linearVelocity,angularVelocity)
@@ -238,9 +240,9 @@ def WhatDoISee():
     for row in grid:
         print(' '.join(row))
 
-def CorridorFollow():
-    global linear , angular, Sfront , Sback , Sleft , Sright
-    Range_To_Stop = 0.5
+def CorridorFollow(centimeter):
+    global linear , angular, Sfront , Sback , Sleft , Sright , goaldistance , previousx, previousy , deltadistance , remaindistance ,count , goaldistance, totaldistance , laser ,state
+    goaldistance = centimeter/100
     deltaX = 0.7
     deltaY = 1
     maxturn = 0.38#0.32 0.37
@@ -254,20 +256,46 @@ def CorridorFollow():
     leftnear = -(slop*Sleft) +1
     rightfar = slop*Sright
     rightnear = -(slop*Sright) +1
-    if Sfront <= 0.2:
-        linear = 0.0 
-        angular = 0.0
+    while totaldistance < goaldistance :  
+        print('Speed = ',linear,'  ','Speed Turn = ',angular)
+        if any((r < 0.3 and r > 0) for r in laser[0:7]+laser[353:360]):  
+            linear = 0.0
+            print('obstacle found fuck!!') 
+            print('remaining distance:',remaindistance*100, 'cm')
+            totaldistance = goaldistance
+        else:
+            deltadistance = math.sqrt(((recentx-previousx)*(recentx-previousx))+((recenty-previousy)*(recenty-previousy))) 
+            totaldistance = totaldistance + deltadistance
+            previousx = recentx
+            previousy = recenty
+            remaindistance = goaldistance - totaldistance
+            print('total distance:',totaldistance)
+
+            if(deltadistance==0.0) and count != 1:
+                count = 1
+            else:
+                pass
+
+            if count == 1:
+                angular = (leftnear*rightfar*(-maxturn)) + (leftfar*rightnear*maxturn)
+                linear = (-((deltaY/maxturn)*angular)+1)*maxspeed
+
+            else:
+                totaldistance = 0.0
+                linear = 0.0 #m/s
+                angular = 0.0
+
+            if linear >= maxspeed:
+                linear = maxspeed
+            if linear <= 0.0:
+                linear = 0.0
+        return linear,angular
     else:
-        angular = (leftnear*rightfar*(-maxturn)) + (leftfar*rightnear*maxturn)
-        linear = (-((deltaY/maxturn)*angular)+1)*maxspeed
-        if linear >= maxspeed:
-            linear = maxspeed
-        if linear <= 0.0:
-            linear = 0.0
-        if Sleft >= Range_To_Stop and Sright >= Range_To_Stop:
-            linear = 0.0
-            angular = 0.0
-    print('Speed = ',linear,'  ','Speed Turn = ',angular)
+        print("destination reached")
+        linear = 0.0 #m/s
+        angular = 0.0
+        state = state+1
+    totaldistance = 0.0
     return linear,angular
 
 def SensorUpdate():

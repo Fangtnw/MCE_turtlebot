@@ -67,6 +67,16 @@ count = 0
 
 wandstate = 1
 target_angle = None
+Orien_help_turn = 0
+all_wall= [0,0,0,0]
+Nowposi = "0"
+check = "0000"
+check_1 = 0
+check_2 = 0
+check_3 = 0
+condition = 5
+firstcheck = 1
+startposi = 1
 
 
 class Turtlebot3Controller(Node):
@@ -145,7 +155,7 @@ class Turtlebot3Controller(Node):
         # linearVelocity,angularVelocity = robotLoop()
         SensorUpdate()
         if state == 1:
-            CorridorFollow(100)
+            GoHome(6)
         # WhatDoISee()
         # SmartWander()
         # linear,angular = robotLoop()
@@ -243,10 +253,10 @@ def WhatDoISee():
 def CorridorFollow(centimeter):
     global linear , angular, Sfront , Sback , Sleft , Sright , goaldistance , previousx, previousy , deltadistance , remaindistance ,count , goaldistance, totaldistance , laser ,state
     goaldistance = centimeter/100
-    deltaX = 0.7
-    deltaY = 1
-    maxturn = 0.38#0.32 0.37
-    maxspeed = 0.078
+    deltaX = 0.35
+    deltaY = 1.0
+    maxturn = 0.30 #0.32 0.37
+    maxspeed = 0.05
     if Sleft >= deltaX:
         Sleft = deltaX
     if Sright >= deltaX:
@@ -260,7 +270,7 @@ def CorridorFollow(centimeter):
         print('Speed = ',linear,'  ','Speed Turn = ',angular)
         if any((r < 0.3 and r > 0) for r in laser[0:7]+laser[353:360]):  
             linear = 0.0
-            print('obstacle found fuck!!') 
+            print('obstacle found!!') 
             print('remaining distance:',remaindistance*100, 'cm')
             totaldistance = goaldistance
         else:
@@ -289,6 +299,9 @@ def CorridorFollow(centimeter):
                 linear = maxspeed
             if linear <= 0.0:
                 linear = 0.0
+            # if Sleft >= 0.25 and Sright >= 0.25:
+            #     linear = 0.0
+            #     angular = 0.0
         return linear,angular
     else:
         print("destination reached")
@@ -457,6 +470,61 @@ def GoTo(centimeter):
         totaldistance = 0.0    
         return linear,angular#,passwalk
 
+def turn(angle): #senpai
+    global linear
+    global angular
+    global state
+    global totaldegree
+    global predegree
+    global nowdegree
+
+    an = 0
+
+    ##if totaldegree == 0:
+    if angle>360 and an == 0:
+        angle = angle-((math.floor(angle/360))*360)
+        an = 1
+        if angle > 180:
+            angle = angle-360
+    elif angle < -360 and an == 0:
+        angle = angle+((math.floor(abs(angle)/360))*360)
+        an = 1
+        if angle < -180:
+            angle = 360 + angle
+    try:
+        euler_from_quaternion(orienx, orieny, orienz, orienw) ## ใช้ degreeZ :หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
+        linear=0.0
+        angular=0.0
+        nowdegree = degreeZ
+        if predegree == 0:
+            predegree = degreeZ
+        if totaldegree<abs(angle) :
+            totaldegree = totaldegree + abs(abs(nowdegree)-abs(predegree))
+            #print('pre = ' , abs(predegree))
+            ##print('now = ' , abs(nowdegree))
+            #print('dis = ' , abs(abs(nowdegree)-abs(predegree)))
+            #print('totaldegree' , totaldegree)
+            predegree = nowdegree
+            if angle > 0:
+                if angle - totaldegree < 9:
+                    angular = 0.05
+                else:
+                    angular = 0.01
+            elif angle < 0:
+                if abs(angle) - totaldegree < 9:
+                    angular = -0.05
+                else:                
+                    angular = -0.01
+        else:
+            totaldegree = 0
+            predegree = 0
+            state = state + 1
+    except NameError:
+        print('Check Node or 00.lunch')
+    except:
+        print("Something else went wrong")
+    return linear,angular
+
 def TurnTo(degrees_to_turn):
     global wandstate, linear, angular, theta, passcal,target_angle,kp
     passcal = 0.0
@@ -500,7 +568,106 @@ def TurnTo(degrees_to_turn):
 
     return linear, angular, passcal
 
+def GTNN(Nnode):
+    global linear
+    global angular
+    global Sfront
+    global Sback
+    global Sleft
+    global Sright
+    global totaldegree
+    global predegree
+    global nowdegree
+    global totaldistance
+    global state
+    global Orien_help_turn
 
+    SensorUpdate()
+    nodedistance = 0.3 # in meter
+    Nnodes = abs(Nnode)
+    total_walk = nodedistance*Nnodes*100 # in centimeter
+    number_wall = 0
+    min = 0.05
+    speed_turn = 0.0 #0.1
+    speed = 0.1#0.08
+    error_detect_wall = 1.8
+    error_walk_nearwall = 0.97
+    error_walk_farwall = 2-error_walk_nearwall
+    output = 0
+
+    ####### Orientation to turn #########
+    euler_from_quaternion(orienx, orieny, orienz, orienw) ## ใช้ degreeZ :หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
+    nowdegree = degreeZ 
+    if predegree == 0:
+        predegree = nowdegree
+    totaldegree = totaldegree + nowdegree-predegree
+    predegree = nowdegree
+    if totaldegree != 0 :
+        #print('totaldegree = ' , totaldegree , totaldistance)
+        if totaldegree > 0:
+            Orien_help_turn = -0.1
+        elif totaldegree < 0:
+            Orien_help_turn = 0.1
+
+    ####### condition that robot see wall ###########
+    if min <= Sleft <= (nodedistance*error_detect_wall): #### wall in left
+        number_wall = 1
+    elif min <= Sright <= (nodedistance*error_detect_wall): #### wall in right
+        number_wall = 2
+    elif min <= Sleft <= (nodedistance*error_detect_wall) and min <= Sright <= (nodedistance*error_detect_wall): #### wall in left and right
+        number_wall = 3
+    else : number_wall = 0
+    print('wall GTNN: ', number_wall)
+    ######## walk @###############
+    #if output == 0:
+    #    if Nnode >0:
+    if Sfront >= (nodedistance/2):
+        #print('walk')
+        if totaldistance <= (total_walk/100):
+            linear,angular = GoTo(total_walk)
+            if number_wall == 0: ##### No wall
+                linear,angular = GoTo(total_walk)
+            if number_wall == 1: #### wall in left
+                if min <= Sleft <= (nodedistance*error_walk_nearwall):
+                    angular = -speed_turn
+                if Sleft >= (nodedistance*error_walk_farwall):
+                    angular = speed_turn
+                else: angular = 0.0
+            if number_wall == 2: #### wall in right
+                if min <= Sright <= (nodedistance*error_walk_nearwall):
+                    angular = speed_turn
+                if Sright >= (nodedistance*error_walk_farwall):
+                    angular = -speed_turn
+                else: A = 0.0
+            if number_wall == 3: #### wall in left and right
+                if min <= Sleft <= (nodedistance*error_walk_nearwall):
+                    angular = -speed_turn
+                if min <= Sright <= (nodedistance*error_walk_nearwall):
+                    angular = speed_turn
+                else: angular = 0.0
+            angular = angular + Orien_help_turn
+        else: output = 1
+        if Nnode<0:
+            linear = 0-linear
+            
+        if output == 1: 
+            Out = round(totaldistance/nodedistance)
+            print('Node that robot pass = ', Out)
+            linear = 0.0 
+            angular = 0.0
+            Out = 0
+            output = 0
+            totaldistance = 0.0
+            totaldegree = 0
+            predegree = 0
+            nowdegree = 0
+            state = state +1
+        print("state:",state)
+    #print('Out', output)
+    # V,A = 0.0,0.0
+    #if Nnode <0:
+    #    V,A = -V,A
+    return linear,angular
 
 def robotStop():
     node = rclpy.create_node('tb3Stop')
@@ -509,7 +676,385 @@ def robotStop():
     msg.linear.x = 0.0
     msg.angular.z = 0.0
     publisher.publish(msg)
-            
+
+def GoHome(nnn):
+    global linear
+    global angular
+    global state
+    global start
+    linear = 0
+    linear = 0
+    if start == 1:
+        if nnn == 1:
+            if state == 1:
+                linear,angular = GTNN(2)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = GTNN(2)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                linear,angular = GTNN(2)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 6:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 7:
+                linear,angular = GTNN(1)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 8:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 9:
+                linear,angular = GTNN(1)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 10:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #m/s
+                angularVelocity = 0.0 #rad/s
+
+        elif nnn == 2:
+            if state == 1:
+                linear,angular = turn(90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = GTNN(1)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #mrad/s
+
+        elif nnn == 3:
+            if state == 1:
+                linear,angular = turn(90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = GTNN(2)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 6:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 7:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #mrad/s
+
+        elif nnn == 4:
+            if state == 1:
+                linear,angular = GTNN(4)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 6:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #mrad/s
+
+        elif nnn == 5:
+            if state == 1:
+                linear,angular = GTNN(2)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = turn(90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = GTNN(2)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                linear,angular = GTNN(2)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 6:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 7:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 8:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 9:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 10:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #mrad/s
+        
+        elif nnn == 6:
+            if state == 1:
+                linear,angular = GTNN(2)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 2:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 3:
+                linear,angular = GTNN(2)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 4:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 5:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 6:
+                linear,angular = turn(-90)
+                ##print('start')
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 7:
+                linear,angular = GTNN(1)
+                ##print('start')/s
+                angularVelocity = 0.0 #
+                linearVelocity = linear #m/s
+                angularVelocity = angular #rad/s
+            elif state == 8:
+                start = 0 ##start = 0 code to stop
+                linearVelocity = 0.0 #mrad/s
+
+    else:
+    ##print('stop')
+        linearVelocity = 0.0 #m/s
+        angularVelocity = 0.0 #rad/s
+    print('state', state)
+    return linearVelocity,angularVelocity        
+
+def UniPlan():
+    global linear
+    global angular
+    global state
+    global start
+    global Sfront
+    global Sback
+    global Sleft
+    global Sright
+    global all_wall
+    global check_1
+    global check_2
+    global check_3
+    global condition 
+
+    linear = 0.0
+    angular = 0.0
+    min = 0.05
+    speed_turn = 0.5
+    speed = 0.08
+    DisNode = 0.28 #in meter
+    DisNodeSen = DisNode
+    error_detect_wall = 1.2
+    DisNodeSen_with_error = DisNodeSen*error_detect_wall
+    
+
+    SensorUpdate()
+    ################ Detect Wall #################
+    if min < Sfront <= DisNodeSen_with_error:
+        all_wall[0] = 1
+    else: all_wall[0] = 0
+    if min < Sleft <= DisNodeSen_with_error:
+        all_wall[1] = 1
+    else: all_wall[1] = 0
+    if min < Sback <= DisNodeSen_with_error:
+        all_wall[2] = 1
+    else: all_wall[2] = 0
+    if min < Sright <= DisNodeSen_with_error:
+        all_wall[3] = 1
+    else: all_wall[3] = 0 
+    wall_front = all_wall[0]
+    wall_left = all_wall[1]
+    wall_back = all_wall[2]
+    wall_right = all_wall[3]
+    ################ condition that reach goal ######################
+    if check_1 == 0:
+        if wall_front + wall_back + wall_left + wall_right >= 3:  # Goal
+            start = 0 ##start = 0 code to stop
+            condition = 0
+        elif DisNode*1.4 <= Sleft <= DisNode*2 and Sright < DisNode  and Sback > DisNode*0.95:
+            condition = 1 #### left to goal
+        elif DisNode*1.4 <= Sright <= DisNode*2 and Sleft < DisNode and Sback > DisNode*0.95:
+            condition = 2 #### right to goal
+        else: condition = 3 ### random walk
+        check_1 = 1
+        if wall_front == 0:
+            check_2 = 1
+        if wall_front == 1:
+            check_2 = 2
+        if wall_right == 0:
+            check_3 = 1
+        if wall_right == 1:
+            check_3 = 2
+    ############### If not reach Goal ########################
+        print("condition: ", condition ," check: ", check_1)
+    if check_1 == 1:
+        print("condition: ", condition ," check: ", check_1, check_2, check_3)
+        if start == 1: 
+            if condition == 0: # Set all Condition Except 2&3
+                state ,linear,angular = 1 ,0.0,0.0 
+                #state = 1
+                check_1 = 0
+                check_2 = 0
+                check_3 = 0
+
+            #### left to goal ####
+            if condition == 1:    
+                if state == 1:
+                    linear,angular = turn(90) #m/s , rad/s 
+                elif state == 2:
+                    linear,angular = GTNN(1) #m/s , rad/s 
+                elif state == 3:
+                    condition = 0  
+            ##### right to goal ####
+            if condition == 2:    
+                if state == 1:
+                    linear,angular = turn(-90) #m/s , rad/s 
+                elif state == 2:
+                    linear,angular = GTNN(1) #m/s , rad/s 
+                elif state == 3:
+                    condition = 0   
+            ####### alway forward ,turn right, turn left ######## 
+            if condition == 3 :
+                if check_2 == 1:
+                    if state == 1:
+                        linear,angular = GTNN(1)
+                    elif state == 2:
+                        condition = 0 
+                if check_2 == 2:
+                    if check_3 == 1:
+                        if state == 1:
+                            linear,angular = turn(-90)
+                        elif state == 2:
+                            condition = 0 
+                    elif check_3 == 2:
+                        if state == 1:
+                            linear,angular = turn(90)
+                        elif state == 2:
+                            condition = 0
+                    else: condition = 0
+        else:
+        ##print('stop')
+            print("Goal")
+            linear = 0.0 #m/s
+            angular = 0.0 #rad/s
+    print(linear,angular)
+    print("all wall: ", all_wall)
+    ##V,A = 0.0,0.0
+    return linear,angular
 
 def main(args=None):
     rclpy.init(args=args)
@@ -525,6 +1070,29 @@ def main(args=None):
         robotStop()
         rclpy.shutdown()
 
+def euler_from_quaternion(x, y, z, w):
+        global degreeZ
+        """
+        Convert a quaternion into euler angles (roll, pitch, yaw)
+        roll is rotation around x in radians (counterclockwise)
+        pitch is rotation around y in radians (counterclockwise)
+        yaw is rotation around z in radians (counterclockwise)
+        """
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll_x = math.atan2(t0, t1)
+     
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        pitch_y = math.asin(t2)
+     
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw_z = math.atan2(t3, t4)
+
+        degreeZ = (yaw_z/math.pi)*180 ##หมุนซ้าย 0 ถึง 180 ต่อด้วย -180 ถึง 0
+        ##return roll_x, pitch_y, yaw_z # in radians
 
 if __name__ == '__main__':
     main()

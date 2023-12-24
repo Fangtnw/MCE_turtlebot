@@ -250,11 +250,11 @@ def Sensor():
                 Senfront = []
                 Sfront1 = 0
                 #print (Sfront,'  ',Senfront)
-    for DATA2 in data[70:110]: #data[55:95]:
+    for DATA2 in data[60:120]: #data[55:95]:
             Senleft.append(DATA2)
             x = len(Senleft)
             Sleft1 = Sleft1 + DATA2
-            if x == 41 :
+            if x == 61 :
                 #print('len',x)
                 Sleft = Sleft1/x
                 Senleft = []
@@ -270,11 +270,11 @@ def Sensor():
                 Senback = []
                 Sback1 = 0
                 #print (Sfront,'  ',Senfront)
-    for DATA4 in data[250:290]:#data[265:305]:
+    for DATA4 in data[240:300]:#data[265:305]:
             Senright.append(DATA4)
             x = len(Senright)
             Sright1 = Sright1 + DATA4
-            if x == 41 :
+            if x == 61 :
                 #print('len',x)
                 Sright = Sright1/x
                 Senright = []
@@ -783,10 +783,11 @@ def HW21():
     global Sback
     global Sleft
     global Sright
-    Range_To_Stop = 0.5
+    Sensor()
+    Range_To_Stop = 0.9
     deltaX = 0.7
     deltaY = 1
-    maxturn = 0.38#0.32 0.37
+    maxturn = 0.4 #0.32 0.37
     maxspeed = 0.078
     if Sleft >= deltaX:
         Sleft = deltaX
@@ -828,13 +829,13 @@ def GTNN(Nnode):
     global Orien_help_turn
 
     Sensor()
-    nodedistance = 0.3 # in meter
+    nodedistance = 0.295 # in meter
     Nnodes = abs(Nnode)
     total_walk = nodedistance*Nnodes*100 # in centimeter
     number_wall = 0
     min = 0.05
-    speed_turn = 0.0 #0.1
-    speed = 0.1#0.08
+    speed_turn = 0.005 #0.1
+    speed = 0.1 #0.08
     error_detect_wall = 1.8
     error_walk_nearwall = 0.97
     error_walk_farwall = 2-error_walk_nearwall
@@ -928,7 +929,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 2:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -938,7 +939,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 4:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -948,7 +949,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 6:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -958,7 +959,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 8:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -974,7 +975,7 @@ def HW40(nnn):
 
         elif nnn == 2:
             if state == 1:
-                V,A = turn(0.1,90)
+                V,A = turn(0.3,90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -984,7 +985,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 3:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1000,7 +1001,7 @@ def HW40(nnn):
 
         elif nnn == 3:
             if state == 1:
-                V,A = turn(0.1,90)
+                V,A = turn(0.3,90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1010,7 +1011,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 3:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1021,7 +1022,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 5:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1042,7 +1043,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 2:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1053,7 +1054,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 4:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1074,7 +1075,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 2:
-                V,A = turn(0.1,90)
+                V,A = turn(0.3,90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1085,7 +1086,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 4:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1096,7 +1097,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 6:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1107,7 +1108,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 8:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1129,7 +1130,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 2:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1140,7 +1141,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 4:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1151,7 +1152,7 @@ def HW40(nnn):
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
             elif state == 6:
-                V,A = turn(0.1,-90)
+                V,A = turn(0.3,-90)
                 ##print('start')
                 linearVelocity = V #m/s
                 angularVelocity = A #rad/s
@@ -1194,7 +1195,7 @@ def HW41():
     speed = 0.08
     DisNode = 0.28 #in meter
     DisNodeSen = DisNode
-    error_detect_wall = 1.2
+    error_detect_wall = 1.35
     DisNodeSen_with_error = DisNodeSen*error_detect_wall
 
     Sensor()
@@ -1220,9 +1221,9 @@ def HW41():
         if wall_front + wall_back + wall_left + wall_right >= 3:  # Goal
             start = 0 ##start = 0 code to stop
             condition = 0
-        elif DisNode*1.4 <= Sleft <= DisNode*2 and Sright < DisNode  and Sback > DisNode*0.95:
+        elif DisNode*1.25 <= Sleft <= DisNode*2 and Sright < DisNode  and Sback > DisNode*0.95:
             condition = 1 #### left to goal
-        elif DisNode*1.4 <= Sright <= DisNode*2 and Sleft < DisNode and Sback > DisNode*0.95:
+        elif DisNode*1.25 <= Sright <= DisNode*2 and Sleft < DisNode and Sback > DisNode*0.95:
             condition = 2 #### right to goal
         else: condition = 3 ### random walk
         check_1 = 1
@@ -1268,7 +1269,8 @@ def HW41():
                     if state == 1:
                         V,A = GTNN(1)
                     elif state == 2:
-                        condition = 0 
+                        print("condition0")
+                        condition = 0
                 if check_2 == 2:
                     if check_3 == 1:
                         if state == 1:
@@ -1281,6 +1283,7 @@ def HW41():
                         elif state == 2:
                             condition = 0
                     else: condition = 0
+
         else:
         ##print('stop')
             print("Goal")
